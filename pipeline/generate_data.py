@@ -5,21 +5,51 @@ from datetime import timedelta
 
 fake = Faker()
 
-users = list(range(1, 10001))
+# -------------------------
+# CONFIG
+# -------------------------
+NUM_USERS = 10000
+
+users = list(range(1, NUM_USERS + 1))
 events = []
 
+channels = [
+    "google_ads",
+    "facebook_ads",
+    "organic",
+    "email",
+    "referral"
+]
+
+# -------------------------
+# GENERATE DATA
+# -------------------------
 for user in users:
+
     # Assign A/B group
     group = random.choice(["A", "B"])
 
-    # Base date (start of journey)
+    # Assign marketing channel
+    channel = random.choice(channels)
+
+    # Base journey date
     base_date = fake.date_this_year()
 
-    # Page View
+    # -------------------------
+    # PAGE VIEW
+    # -------------------------
     page_date = base_date
-    events.append([page_date, "page_view", user, group])
+    events.append([
+        page_date,
+        "page_view",
+        user,
+        group,
+        channel
+    ])
 
-    # Behavior probabilities
+    # -------------------------
+    # BASE PROBABILITIES (A/B)
+    # -------------------------
     if group == "A":
         signup_prob = 0.6
         purchase_prob = 0.3
@@ -27,18 +57,75 @@ for user in users:
         signup_prob = 0.7
         purchase_prob = 0.4
 
-    # Sign Up (after page view)
+    # -------------------------
+    # CHANNEL MODIFIERS (KEY UPGRADE)
+    # -------------------------
+    if channel == "google_ads":
+        signup_prob += 0.05
+        purchase_prob += 0.05
+
+    elif channel == "facebook_ads":
+        signup_prob -= 0.05
+        purchase_prob -= 0.05
+
+    elif channel == "email":
+        signup_prob += 0.03
+        purchase_prob += 0.02
+
+    elif channel == "referral":
+        signup_prob += 0.07
+        purchase_prob += 0.06
+
+    elif channel == "organic":
+        signup_prob += 0.02
+        purchase_prob += 0.01
+
+    # Ensure probabilities stay valid
+    signup_prob = min(max(signup_prob, 0), 1)
+    purchase_prob = min(max(purchase_prob, 0), 1)
+
+    # -------------------------
+    # SIGN UP
+    # -------------------------
     if random.random() < signup_prob:
         signup_date = page_date + timedelta(days=random.randint(0, 5))
-        events.append([signup_date, "sign_up", user, group])
 
-        # Purchase (after signup)
+        events.append([
+            signup_date,
+            "sign_up",
+            user,
+            group,
+            channel
+        ])
+
+        # -------------------------
+        # PURCHASE
+        # -------------------------
         if random.random() < purchase_prob:
             purchase_date = signup_date + timedelta(days=random.randint(0, 5))
-            events.append([purchase_date, "purchase", user, group])
 
-df = pd.DataFrame(events, columns=["event_date", "event_name", "user_id", "group"])
+            events.append([
+                purchase_date,
+                "purchase",
+                user,
+                group,
+                channel
+            ])
 
+# -------------------------
+# CREATE DATAFRAME
+# -------------------------
+df = pd.DataFrame(events, columns=[
+    "event_date",
+    "event_name",
+    "user_id",
+    "group",
+    "channel"
+])
+
+# -------------------------
+# SAVE FILE
+# -------------------------
 df.to_csv("data/events.csv", index=False)
 
-print("✅ Realistic A/B test data generated!")
+print("✅ Data generated with A/B testing + channel attribution + realistic conversion differences!")

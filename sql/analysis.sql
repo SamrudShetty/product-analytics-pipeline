@@ -173,3 +173,80 @@ JOIN cohort_size cs
     ON ua.cohort_date = cs.cohort_date
 GROUP BY ua.cohort_date, ua.days_since_signup, cs.total_users
 ORDER BY ua.cohort_date, ua.days_since_signup;
+
+-- =========================================
+-- 9. MARKETING CHANNEL PERFORMANCE
+-- =========================================
+
+WITH users AS (
+  SELECT
+    user_id,
+    channel,
+    MAX(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS viewed,
+    MAX(CASE WHEN event_name = 'sign_up' THEN 1 ELSE 0 END) AS signed_up,
+    MAX(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchased
+  FROM events
+  GROUP BY user_id, channel
+)
+
+SELECT
+  channel,
+  SUM(viewed) AS users,
+  SUM(signed_up)::float / SUM(viewed) AS signup_rate,
+  SUM(purchased)::float / SUM(signed_up) AS purchase_rate
+FROM users
+GROUP BY channel
+ORDER BY users DESC;
+
+
+-- =========================================
+-- 10. CHANNEL DROP-OFF ANALYSIS
+-- =========================================
+
+WITH users AS (
+  SELECT
+    user_id,
+    channel,
+    MAX(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS viewed,
+    MAX(CASE WHEN event_name = 'sign_up' THEN 1 ELSE 0 END) AS signed_up,
+    MAX(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchased
+  FROM events
+  GROUP BY user_id, channel
+)
+
+SELECT
+  channel,
+  SUM(viewed) AS visitors,
+  SUM(signed_up) AS signups,
+  SUM(purchased) AS purchases,
+  (SUM(viewed) - SUM(signed_up)) AS drop_after_view,
+  (SUM(signed_up) - SUM(purchased)) AS drop_after_signup
+FROM users
+GROUP BY channel
+ORDER BY visitors DESC;
+
+-- =========================================
+-- 11. A/B TEST PERFORMANCE BY CHANNEL
+-- =========================================
+
+WITH users AS (
+  SELECT
+    user_id,
+    channel,
+    "group",
+    MAX(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS viewed,
+    MAX(CASE WHEN event_name = 'sign_up' THEN 1 ELSE 0 END) AS signed_up,
+    MAX(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchased
+  FROM events
+  GROUP BY user_id, channel, "group"
+)
+
+SELECT
+  channel,
+  "group",
+  SUM(viewed) AS users,
+  SUM(signed_up)::float / SUM(viewed) AS signup_rate,
+  SUM(purchased)::float / SUM(signed_up) AS purchase_rate
+FROM users
+GROUP BY channel, "group"
+ORDER BY channel, "group";

@@ -3,6 +3,9 @@ import pandas as pd
 from sqlalchemy import create_engine
 from urllib.parse import quote_plus
 
+# -------------------------
+# DB CONNECTION
+# -------------------------
 password = quote_plus("admin@123")
 engine = create_engine(
     f"postgresql://postgres:{password}@localhost:5432/analytics"
@@ -12,10 +15,10 @@ st.set_page_config(page_title="Product Analytics Dashboard", layout="wide")
 
 st.title("📊 Product Analytics Dashboard")
 
-# -------------------------
+# =========================
 # FUNNEL DATA
-# -------------------------
-query = """
+# =========================
+funnel_query = """
 WITH users AS (
     SELECT
         user_id,
@@ -35,7 +38,7 @@ SELECT
 FROM users;
 """
 
-df = pd.read_sql(query, engine)
+df = pd.read_sql(funnel_query, engine)
 
 viewed = int(df["viewed_users"][0])
 signed = int(df["signup_users"][0])
@@ -44,33 +47,43 @@ purchased = int(df["purchased_users"][0])
 signup_rate = round(df["signup_rate"][0] * 100, 2)
 purchase_rate = round(df["purchase_rate"][0] * 100, 2)
 
-# Metrics
+# =========================
+# KEY METRICS
+# =========================
 st.subheader("📌 Key Metrics")
+
 col1, col2, col3 = st.columns(3)
 
 col1.metric("👀 Visitors", viewed)
 col2.metric("📝 Signups", f"{signed} ({signup_rate}%)")
 col3.metric("💰 Purchases", f"{purchased} ({purchase_rate}%)")
 
-# Funnel Chart
+# =========================
+# FUNNEL CHART
+# =========================
 st.subheader("📉 Funnel Drop-off")
+
 funnel_df = pd.DataFrame({
     "Stage": ["Page View", "Sign Up", "Purchase"],
     "Users": [viewed, signed, purchased]
 })
+
 st.bar_chart(funnel_df.set_index("Stage"))
 
-# Insights
-st.subheader("🧠 Insights")
+# =========================
+# INSIGHTS
+# =========================
+st.subheader("🧠 Funnel Insights")
+
 st.write(f"""
 - {signup_rate}% users sign up after visiting  
 - Only {purchase_rate}% convert after signup  
-- Major drop happens post signup  
+- Major drop-off occurs after signup  
 """)
 
-# -------------------------
+# =========================
 # A/B TEST
-# -------------------------
+# =========================
 ab_query = """
 WITH users AS (
     SELECT
@@ -98,11 +111,73 @@ ab_df = pd.read_sql(ab_query, engine)
 st.subheader("🧪 A/B Test Results")
 st.dataframe(ab_df)
 
+st.subheader("🧪 A/B Test Insights")
+
+st.write("""
+- Variant B shows higher conversion rates  
+- ~10% improvement in signup and purchase rates  
+- Indicates better UX or messaging in Variant B  
+
+### Recommendation:
+Roll out Variant B to all users  
+""")
+
 st.success("🚀 Variant B is the winning version!")
 
-# -------------------------
-# COHORT HEATMAP
-# -------------------------
+# =========================
+# CHANNEL PERFORMANCE
+# =========================
+channel_query = """
+WITH users AS (
+    SELECT
+        user_id,
+        channel,
+        MAX(CASE WHEN event_name = 'page_view' THEN 1 ELSE 0 END) AS viewed,
+        MAX(CASE WHEN event_name = 'sign_up' THEN 1 ELSE 0 END) AS signed_up,
+        MAX(CASE WHEN event_name = 'purchase' THEN 1 ELSE 0 END) AS purchased
+    FROM events
+    GROUP BY user_id, channel
+)
+
+SELECT
+    channel,
+    SUM(viewed) AS users,
+    SUM(signed_up)::float / SUM(viewed) AS signup_rate,
+    SUM(purchased)::float / SUM(signed_up) AS purchase_rate
+FROM users
+GROUP BY channel
+ORDER BY users DESC;
+"""
+
+channel_df = pd.read_sql(channel_query, engine)
+
+st.subheader("📢 Channel Performance")
+st.dataframe(channel_df)
+
+# =========================
+# CHANNEL CHART
+# =========================
+st.subheader("📊 Channel Conversion Comparison")
+
+chart_df = channel_df.set_index("channel")[["signup_rate", "purchase_rate"]]
+st.bar_chart(chart_df)
+
+# =========================
+# CHANNEL INSIGHTS
+# =========================
+st.subheader("🧠 Channel Insights")
+
+best_channel = channel_df.sort_values("purchase_rate", ascending=False).iloc[0]["channel"]
+
+st.write(f"""
+- Best performing channel: **{best_channel}**  
+- Conversion varies significantly across channels  
+- Opportunity to shift budget toward high-performing channels  
+""")
+
+# =========================
+# COHORT ANALYSIS
+# =========================
 st.subheader("🔥 Cohort Retention")
 
 cohort_query = """
