@@ -66,12 +66,12 @@ images/ → dashboard screenshots
 ---
 
 ### 🧪 A/B Test Results
-![A/B Test](images/ab_test.jpg)
+![A/B Test](images/ab_Test.jpg)
 
 ---
 
 ### 🔥 Cohort Analysis
-![Cohort](images/cohort.jpg)
+![Cohort](images/Cohort.jpg)
 
 ---
 
